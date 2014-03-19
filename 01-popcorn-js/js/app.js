@@ -43,9 +43,9 @@ Popcorn.getMovies = function (categories) {
           existingMovie.categories.push(category);
         }
       });
+      $(Popcorn).trigger('modelReady:' + category);
     });
   });
-  $(Popcorn).trigger('modelReady');
 };
 
 Popcorn.getCast = function (movieID) {
@@ -68,20 +68,20 @@ Popcorn.getCast = function (movieID) {
 };
 
 Popcorn.listMovies = function (category, container) {
-  var movies = _.findWhere(this.movies, { 'categories': category });
-  console.log(this.movies);
+  var movies = _.filter(Popcorn.movies, function (movie) {
+    return _.where(movie.categories, category);
+  });
 
   var imgUrl = 'https://image.tmdb.org/t/p/w92';
 
   $.each(movies, function (index, movie) {
-    Popcorn.movies[category].push(movie);
     var movieElement = $('<a/>')
       .attr('href', '#')
       .on('click', function (){
         Popcorn.showMovie(movie.id);
       });
     var moviePoster = $('<img/>')
-      .attr('src', imgUrl + movie.poster_path)
+      .attr('src', movie.small_poster_url)
       .attr('alt', movie.title);
 
     movieElement.append(moviePoster);
@@ -92,52 +92,42 @@ Popcorn.listMovies = function (category, container) {
 Popcorn.showMovie = function (movieID) {
   var container = $('.js-movie-details');
   container.fadeIn();
-  var url = this.apiPath + movieID + this.apiKey;
+  var movie = _.findWhere(this.movies, { 'id': movieID });
 
-  $.getJSON(url, function (movie) {
-    var movieYear = movie.release_date.substring(0, 4);
-    $('.js-movie-title').text(movie.title + ' (' + movieYear + ')');
-    $('.js-movie-description').text(movie.overview);
+  $('.js-movie-title').text(movie.title + ' (' + movie.year + ')');
+  $('.js-movie-description').text(movie.overview);
 
-    var imgUrl = 'https://image.tmdb.org/t/p/w300' + movie.poster_path;
-    $('.js-movie-poster')
-        .attr('src', imgUrl)
-        .attr('alt', movie.title);
-  });
+  $('.js-movie-poster')
+      .attr('src', movie.large_poster_url)
+      .attr('alt', movie.title);
 
-  Popcorn.listCast(movieID);
-};
+  var castContainer = $('.js-movie-cast');
+  castContainer.html('');
 
-Popcorn.listCast = function (movieID) {
-  var url = this.apiPath + movieID + '/credits' + this.apiKey;
-  $.getJSON(url, function (data) {
-    var cast = data.cast;
-    var castImgUrl = 'https://image.tmdb.org/t/p/w45';
-    var castContainer = $('.js-movie-cast');
-    castContainer.html('');
-    for(var i = 0; i < 3; i++) {
-      var castMember = $('<li/>');
-      var castMemberPhoto = $('<img/>')
-        .attr('src', castImgUrl + cast[i].profile_path)
-        .attr('alt', cast[i].name);
-      var castMemberName = $('<span/>').text(cast[i].name);
-      castMember.append(castMemberPhoto);
-      castMember.append(castMemberName);
-      castContainer.append(castMember);
-    }
+  $.each(movie.cast, function (index, cast) {
+    var castMember = $('<li/>');
+    var castMemberPhoto = $('<img/>')
+      .attr('src', cast.image_url)
+      .attr('alt', cast.name);
+    var castMemberName = $('<span/>').text(cast.name);
+    castMember.append(castMemberPhoto);
+    castMember.append(castMemberName);
+    castContainer.append(castMember);
   });
 };
 
 function init() {
-  Popcorn.getMovies(['popular', 'top_rated']);
+  Popcorn.categories = ['popular', 'top_rated'];
+  Popcorn.getMovies(Popcorn.categories);
 }
 
 (function($) {
   init();
 
-  $(Popcorn).on('modelReady', function (){
-    Popcorn.listMovies('popular', '.js-popular');
-    Popcorn.listMovies('top_rated', '.js-top-rated');
+  $.each(Popcorn.categories, function (index, category){
+    $(Popcorn).on('modelReady:' + category, function (){
+      Popcorn.listMovies(category, '.js-' + category);
+    });
   });
   
 })(jQuery);
